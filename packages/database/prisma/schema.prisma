@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Conversation {
+  id              String    @id @default(uuid())
+  messages        Json
+  fullText        String
+  qdrantPointId   String?   @unique
+  messageCount    Int
+  resolved        Boolean?
+  sentimentScore  Float?
+  clusterId       Int?
+  cluster         Cluster?  @relation(fields: [clusterId], references: [id])
+  conversationAt  DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([clusterId])
+}
+
+model AnalysisRun {
+  id                 Int       @id @default(autoincrement())
+  status             RunStatus @default(PENDING)
+  totalConversations Int
+  clustersFound      Int?
+  noisePoints        Int?
+  silhouetteScore    Float?
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  clusters           Cluster[]
+  insights           Insight[]
+}
+
+enum RunStatus {
+  PENDING
+  EMBEDDING
+  CLUSTERING
+  LABELING
+  COMPLETE
+  FAILED
+}
+
+model Cluster {
+  id            Int       @id @default(autoincrement())
+  runId         Int
+  run           AnalysisRun @relation(fields: [runId], references: [id])
+  label         String
+  size          Int
+  percentage    Float
+  priorityScore Float?
+  trend         Trend?
+  conversations Conversation[]
+  insights      Insight[]
+  createdAt     DateTime  @default(now())
+
+  @@index([runId])
+}
+
+enum Trend {
+  NEW
+  GROWING
+  STABLE
+  SHRINKING
+}
+
+model Insight {
+  id              String    @id @default(uuid())
+  runId           Int
+  run             AnalysisRun @relation(fields: [runId], references: [id])
+  clusterId       Int
+  cluster         Cluster   @relation(fields: [clusterId], references: [id])
+  headline        String
+  detail          String
+  recommendation  String?
+  severity        Severity
+  affectedPercent Float
+  affectedCount   Int
+  exampleQuotes   String[]
+  status          InsightStatus @default(NEW)
+  createdAt       DateTime  @default(now())
+
+  @@index([runId])
+  @@index([severity])
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum InsightStatus {
+  NEW
+  ACKNOWLEDGED
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+}
