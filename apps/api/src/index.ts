@@ -1,6 +1,7 @@
 import cors from "cors";
 import "dotenv/config";
 import express from "express";
+import mainRouter from "./routes";
 
 const app = express();
 app.use(express.json());
@@ -17,8 +18,8 @@ app.use(
     }),
 );
 
-app.use("/api/v1", routes);
+app.use("/api/v1", mainRouter);
 
-server.listen(SERVER_PORT, () => {
+app.listen(PORT, () => {
     console.log("Server is running port : 8000")
 });
