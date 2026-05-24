@@ -10,12 +10,16 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "@qdrant/js-client-rest": "^1.13.0",
+    "@repo/database": "workspace:*",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "groq-sdk": "^0.13.0",
     "jsonwebtoken": "^9.0.3",
     "zod": "^4.4.3"
   }

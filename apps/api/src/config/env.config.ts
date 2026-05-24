@@ -12,8 +12,11 @@ const envSchema = z.object({
     DATABASE_URL: z.url(),
     OPENAI_EMBED_MODEL: z.string().optional(),
     QDRANT_URL: z.url().optional(),
+    QDRANT_API_KEY: z.string().min(1),
     QDRANT_CLUSTER_ID: z.string().optional(),
     OPENROUTER_API_KEY: z.string().optional(),
+    GOOGLE_API_KEY: z.string().min(1),
+    GROQ_API_KEY: z.string().min(1),
     NEXT_PUBLIC_APP_URL: z.string().optional(),
     NEXT_PUBLIC_API_URL: z.string().optional(),
   });
