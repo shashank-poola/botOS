@@ -18,7 +18,6 @@ async function getEmbedding(text: string, attempt = 0): Promise<number[]> {
         const status = (err as { status?: number })?.status;
         if (status === 429 && attempt < 4) {
             const backoff = Math.pow(2, attempt) * 2000;
-            console.log(`Rate limited. Retrying in ${backoff / 1000}s (attempt ${attempt + 1})`);
             await sleep(backoff);
             return getEmbedding(text, attempt + 1);
         }
@@ -34,8 +33,8 @@ export async function embedAndStore(
 
     for (let i = 0; i < conversations.length; i++) {
         const conv = conversations[i]!;
-        console.log(`Embedding ${i + 1}/${conversations.length}: ${conv.id}`);
         const vector = await getEmbedding(conv.fullText);
+        process.stdout.write(`\rEmbedding ${i + 1}/${conversations.length}`);
         points.push({ id: conv.id, vector, payload: { conversationId: conv.id } });
 
         if (points.length === UPSERT_BATCH || i === conversations.length - 1) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useReducer, type Dispatch } from 'react';
+import { createContext, useContext, useReducer, createElement, type Dispatch, type ReactNode } from 'react';
 import type { AnalysisRun, Insight, Cluster } from '../types';
 
 interface DashboardState {
@@ -60,6 +60,17 @@ const DashboardContext = createContext<{
     state: DashboardState;
     dispatch: Dispatch<Action>;
 } | null>(null);
+
+export function DashboardProvider({ children }: { children: ReactNode }) {
+    const [state, dispatch] = useReducer(reducer, initialState);
+    return createElement(DashboardContext.Provider, { value: { state, dispatch } }, children);
+}
+
+export function useDashboard() {
+    const ctx = useContext(DashboardContext);
+    if (!ctx) throw new Error('useDashboard must be used within DashboardProvider');
+    return ctx;
+}
 
 export { DashboardContext, reducer, initialState };
 export type { DashboardState, Action };
