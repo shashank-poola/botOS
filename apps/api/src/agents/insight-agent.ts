@@ -66,9 +66,7 @@ export async function runPipeline(runId: number): Promise<void> {
     const allVectors = await getAllVectors();
     const clusterResults = clusterVectors(allVectors);
 
-    const noise = clusterResults.filter((r) => r.clusterId === -1);
-    const clustered = clusterResults.filter((r) => r.clusterId !== -1);
-    const uniqueClusterIds = [...new Set(clustered.map((r) => r.clusterId))];
+    const uniqueClusterIds = [...new Set(clusterResults.map((r) => r.clusterId))];
     const silhouette = computeSilhouette(allVectors, clusterResults);
 
     await db.analysisRun.update({
@@ -76,7 +74,7 @@ export async function runPipeline(runId: number): Promise<void> {
         data: {
             status: "LABELING",
             clustersFound: uniqueClusterIds.length,
-            noisePoints: noise.length,
+            noisePoints: 0,
             silhouetteScore: silhouette,
         },
     });
@@ -89,7 +87,7 @@ export async function runPipeline(runId: number): Promise<void> {
             where: { id: { in: memberIds } },
         });
 
-        const affectedPercent = (memberIds.length / conversations.length) * 100;
+        const affectedPercent = parseFloat(((memberIds.length / conversations.length) * 100).toFixed(2));
         const label = await labelCluster(memberConvos, affectedPercent);
         const priorityScore = affectedPercent * (severityWeight[label.severity] ?? 1);
 
@@ -108,11 +106,6 @@ export async function runPipeline(runId: number): Promise<void> {
             data: { clusterId: cluster.id },
         });
 
-        const exampleQuotes = memberConvos.slice(0, 3).map((c) => {
-            const line = c.fullText.split("\n").find((l) => l.startsWith("Customer:"));
-            return line?.replace("Customer:", "").trim() ?? c.fullText.substring(0, 100);
-        });
-
         await db.insight.create({
             data: {
                 runId,
@@ -123,7 +116,7 @@ export async function runPipeline(runId: number): Promise<void> {
                 severity: label.severity,
                 affectedPercent,
                 affectedCount: memberIds.length,
-                exampleQuotes,
+                exampleQuotes: label.exampleQuotes ?? [],
             },
         });
     }

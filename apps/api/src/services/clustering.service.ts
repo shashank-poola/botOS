@@ -3,89 +3,124 @@ export interface ClusterResult {
     clusterId: number;
 }
 
+function dot(a: number[], b: number[]): number {
+    let s = 0;
+    for (let i = 0; i < a.length; i++) s += (a[i] ?? 0) * (b[i] ?? 0);
+    return s;
+}
+
+function norm(a: number[]): number {
+    return Math.sqrt(dot(a, a));
+}
+
 function cosineSimilarity(a: number[], b: number[]): number {
-    let dot = 0, magA = 0, magB = 0;
-    for (let i = 0; i < a.length; i++) {
-        const ai = a[i] ?? 0;
-        const bi = b[i] ?? 0;
-        dot += ai * bi;
-        magA += ai * ai;
-        magB += bi * bi;
+    const d = norm(a) * norm(b);
+    return d === 0 ? 0 : dot(a, b) / d;
+}
+
+function normalize(v: number[]): number[] {
+    const n = norm(v);
+    return n === 0 ? v : v.map((x) => x / n);
+}
+
+function arraysEqual(a: number[], b: number[]): boolean {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+function initKMeansPlusPlus(
+    vectors: Array<{ id: string; vector: number[] }>,
+    k: number
+): number[][] {
+    const centroids: number[][] = [];
+    const first = Math.floor(Math.random() * vectors.length);
+    centroids.push(normalize([...(vectors[first]?.vector ?? [])]));
+
+    while (centroids.length < k) {
+        const distances = vectors.map((v) => {
+            const sims = centroids.map((c) => cosineSimilarity(v.vector, c));
+            const maxSim = Math.max(...sims);
+            return Math.pow(1 - maxSim, 2);
+        });
+
+        const total = distances.reduce((s, d) => s + d, 0);
+        let rand = Math.random() * total;
+        let chosen = distances.length - 1;
+        for (let i = 0; i < distances.length; i++) {
+            rand -= distances[i] ?? 0;
+            if (rand <= 0) {
+                chosen = i;
+                break;
+            }
+        }
+        centroids.push(normalize([...(vectors[chosen]?.vector ?? [])]));
     }
-    const denom = Math.sqrt(magA) * Math.sqrt(magB);
-    return denom === 0 ? 0 : dot / denom;
+
+    return centroids;
 }
 
 export function clusterVectors(
     vectors: Array<{ id: string; vector: number[] }>,
-    threshold = 0.78,
-    minClusterSize = 3
+    k = 6,
+    maxIterations = 50
 ): ClusterResult[] {
-    const n = vectors.length;
-    const adj: Set<number>[] = Array.from({ length: n }, () => new Set<number>());
+    if (vectors.length === 0) return [];
+    const effectiveK = Math.min(k, vectors.length);
 
-    for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) {
-            const vi = vectors[i]?.vector;
-            const vj = vectors[j]?.vector;
-            if (vi && vj && cosineSimilarity(vi, vj) >= threshold) {
-                adj[i]?.add(j);
-                adj[j]?.add(i);
-            }
-        }
-    }
+    const centroids = initKMeansPlusPlus(vectors, effectiveK);
+    let assignments: number[] = new Array(vectors.length).fill(0) as number[];
 
-    const labels: number[] = new Array(n).fill(-1) as number[];
-    let clusterId = 0;
-
-    for (let i = 0; i < n; i++) {
-        if (labels[i] !== -1) continue;
-        const queue: number[] = [i];
-        labels[i] = clusterId;
-        while (queue.length > 0) {
-            const curr = queue.shift()!;
-            for (const neighbor of adj[curr] ?? []) {
-                if (labels[neighbor] === -1) {
-                    labels[neighbor] = clusterId;
-                    queue.push(neighbor);
+    for (let iter = 0; iter < maxIterations; iter++) {
+        const newAssignments = vectors.map((v) => {
+            let best = 0;
+            let bestSim = -Infinity;
+            for (let c = 0; c < centroids.length; c++) {
+                const sim = cosineSimilarity(v.vector, centroids[c] ?? []);
+                if (sim > bestSim) {
+                    bestSim = sim;
+                    best = c;
                 }
             }
+            return best;
+        });
+
+        if (arraysEqual(assignments, newAssignments)) break;
+        assignments = newAssignments;
+
+        const dim = vectors[0]?.vector.length ?? 0;
+        for (let c = 0; c < effectiveK; c++) {
+            const members = vectors.filter((_, i) => assignments[i] === c);
+            if (members.length === 0) continue;
+            const sum = new Array(dim).fill(0) as number[];
+            for (const m of members) {
+                for (let d = 0; d < dim; d++) {
+                    sum[d] = (sum[d] ?? 0) + (m.vector[d] ?? 0);
+                }
+            }
+            centroids[c] = normalize(sum);
         }
-        clusterId++;
     }
 
-    const sizes = new Map<number, number>();
-    for (const l of labels) {
-        sizes.set(l, (sizes.get(l) ?? 0) + 1);
-    }
-
-    return vectors.map((v, i) => {
-        const label = labels[i] ?? -1;
-        return {
-            id: v.id,
-            clusterId: (sizes.get(label) ?? 0) >= minClusterSize ? label : -1,
-        };
-    });
+    return vectors.map((v, i) => ({ id: v.id, clusterId: assignments[i] ?? 0 }));
 }
 
 export function computeSilhouette(
     vectors: Array<{ id: string; vector: number[] }>,
     results: ClusterResult[]
 ): number {
-    const valid = results.filter((r) => r.clusterId !== -1);
-    const clusterIds = [...new Set(valid.map((r) => r.clusterId))];
+    const clusterIds = [...new Set(results.map((r) => r.clusterId))];
     if (clusterIds.length < 2) return 0;
 
     const idxMap = new Map<string, number>(vectors.map((v, i) => [v.id, i]));
-    let total = 0, count = 0;
+    let total = 0;
+    let count = 0;
 
-    for (const result of valid) {
+    for (const result of results) {
         const i = idxMap.get(result.id);
         if (i === undefined) continue;
         const vi = vectors[i]?.vector;
         if (!vi) continue;
 
-        const sameCluster = valid.filter((r) => r.clusterId === result.clusterId && r.id !== result.id);
+        const sameCluster = results.filter((r) => r.clusterId === result.clusterId && r.id !== result.id);
         if (sameCluster.length === 0) continue;
 
         const getVec = (id: string): number[] | undefined => {
@@ -93,19 +128,22 @@ export function computeSilhouette(
             return idx !== undefined ? vectors[idx]?.vector : undefined;
         };
 
-        const a = sameCluster.reduce((s, r) => {
-            const vj = getVec(r.id);
-            return s + (vj ? 1 - cosineSimilarity(vi, vj) : 0);
-        }, 0) / sameCluster.length;
+        const a =
+            sameCluster.reduce((s, r) => {
+                const vj = getVec(r.id);
+                return s + (vj ? 1 - cosineSimilarity(vi, vj) : 0);
+            }, 0) / sameCluster.length;
 
         const bValues = clusterIds
             .filter((c) => c !== result.clusterId)
             .map((c) => {
-                const others = valid.filter((r) => r.clusterId === c);
-                return others.reduce((s, r) => {
-                    const vj = getVec(r.id);
-                    return s + (vj ? 1 - cosineSimilarity(vi, vj) : 0);
-                }, 0) / (others.length || 1);
+                const others = results.filter((r) => r.clusterId === c);
+                return (
+                    others.reduce((s, r) => {
+                        const vj = getVec(r.id);
+                        return s + (vj ? 1 - cosineSimilarity(vi, vj) : 0);
+                    }, 0) / (others.length || 1)
+                );
             });
 
         if (bValues.length === 0) continue;

@@ -3,6 +3,10 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -10,7 +14,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.0",
+    "@google/genai": "^2.6.0",
     "@qdrant/js-client-rest": "^1.13.0",
     "@repo/database": "workspace:*",
     "@types/cors": "^2.8.19",
