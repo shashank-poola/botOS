@@ -137,6 +137,13 @@ GET    /api/v1/health                       Health check
 
 ---
 
+## Web Preview
+
+![WebPreview Diagram](./apps/web/public/web1.png)
+![WebPreview Diagram](./apps/web/public/web2.png)
+
+---
+
 ## Project Structure
 
 ```
