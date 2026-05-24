@@ -27,7 +27,7 @@ Delivery ETA failure on time-sensitive orders       —  HIGH      (12%)
 
 ## Architecture
 
-![Architecture Diagram](./architecture.png)
+![Architecture Diagram](./apps/web/public/architecture.png)
 
 ```
 POST /api/v1/analyze

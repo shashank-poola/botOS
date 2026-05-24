@@ -1,5 +1,7 @@
 # BotOS(Architecture) - Sentiment analytics engine
 
+![Architecture Diagram](./apps/web/public/architecture.png)
+
 ## Pipeline (async)
 
 ```
