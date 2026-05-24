@@ -1,15 +1,15 @@
-# Botos — Reasoning
+# BotOS(Reasoning) - Sentiment analytics engine
 
 ## The Problem
 
-Customer support teams generate hundreds of conversations per day. PMs can't read them all. They need signal, not volume — what's breaking, how often, and what to fix.
+Customer support teams generate hundreds of conversations per day. PMs can't read them all. They need signal, not volume - what's breaking, how often, and what to fix.
 
 The output should look like this:
 
 ```
-Billing system charges customers post-cancellation — CRITICAL (18%)
-Claims processing silently blocks on undisclosed document requirements — HIGH (14%)
-Delivery ETA failure on time-sensitive orders — HIGH (12%)
+Billing system charges customers post-cancellation - CRITICAL (18%)
+Claims processing silently blocks on undisclosed document requirements - HIGH (14%)
+Delivery ETA failure on time-sensitive orders - HIGH (12%)
 ```
 
 Not this:
@@ -26,7 +26,7 @@ Conversation 2: "My package is late..."
 
 ## Database: PostgreSQL + Prisma
 
-PostgreSQL because the data is relational — conversations belong to clusters, clusters belong to runs, insights reference both. Filtering by runId + severity + status is a simple WHERE clause.
+PostgreSQL because the data is relational - conversations belong to clusters, clusters belong to runs, insights reference both. Filtering by runId + severity + status is a simple WHERE clause.
 
 Prisma for type-safe queries. Schema mismatches surface at compile time.
 
@@ -46,7 +46,7 @@ Schema notes:
 
 - Fast scroll API — needed to pull all vectors back for clustering
 - Cloud-hosted, free tier, zero config
-- UUID point IDs map directly to Prisma IDs — no translation layer
+- UUID point IDs map directly to Prisma IDs - no translation layer
 
 **Not pgvector:** same Postgres instance means resource contention during embedding. Also, full-table cosine scans are slow past 10k vectors without an HNSW index.
 
@@ -56,7 +56,7 @@ Schema notes:
 
 ## Embedding Model: Gemini (gemini-embedding-001)
 
-- 768-dim vectors with `outputDimensionality` cap — keeps Qdrant storage and clustering cheap
+- 768-dim vectors with `outputDimensionality` cap - keeps Qdrant storage and clustering cheap
 - Best free-tier quality for English support text
 - `@google/genai` SDK has clean TypeScript types
 
@@ -78,7 +78,7 @@ K-means++ initialization for better starting centroids. 50 iterations is enough 
 
 **Not HDBSCAN:**
 - No production JS/TS library for it
-- Classifies 30–40% of points as noise — those conversations get no insight card
+- Classifies 30–40% of points as noise - those conversations get no insight card
 - Needs per-dataset tuning of `minClusterSize` and `minSamples`. K-means only needs `k`, which maps directly to "how many cards do you want"
 - At 50k+ conversations: UMAP (768→20 dims) + HDBSCAN makes more sense. K-means spherical assumption breaks at that scale. For 50–5k, K-means is simpler and faster.
 
@@ -88,7 +88,7 @@ Silhouette score computed post-clustering to measure separation quality (range: 
 
 ## LLM Labeling: Groq + Llama 3.3 70B
 
-Groq because it's fast — labeling 6 clusters takes ~3–4 seconds total via LPU hardware. Same work on a standard GPU endpoint takes 20–30 seconds.
+Groq because it's fast - labeling 6 clusters takes ~3–4 seconds total via LPU hardware. Same work on a standard GPU endpoint takes 20–30 seconds.
 
 Llama 3.3 70B follows structured JSON instructions reliably. `response_format: { type: "json_object" }` ensures parseable output. Temperature 0.1 for consistent results.
 
@@ -103,7 +103,7 @@ Without prompt constraints, the output defaults to corporate generalities. The s
 
 ## API Design
 
-REST over GraphQL — the query surface is small and predictable. Four endpoints don't need resolver infrastructure.
+REST over GraphQL - the query surface is small and predictable. Four endpoints don't need resolver infrastructure.
 
 `POST /analyze` returns 202 Accepted with a run ID. The pipeline takes 30–120 seconds. Polling `/runs/:id/status` is the correct pattern for async work — the client never times out.
 
@@ -113,13 +113,13 @@ Zod validation at every boundary. ZodError caught by error middleware, returned 
 
 ## What I'd Do With More Time
 
-1. **Real-time ingestion** — webhook endpoints for Intercom, Zendesk, Freshdesk. Run pipeline on a rolling window instead of seeding from JSON.
-2. **Trend detection** — compare cluster composition between runs. Flag clusters that are GROWING before they become crises.
-3. **Semantic search** — `POST /search` that embeds a query and returns nearest-neighbor conversations via Qdrant.
-4. **Auto-severity calibration** — learn from PM status updates. If PMs keep escalating MEDIUM to CRITICAL, adjust the scoring weights.
-5. **Slack / Linear push** — CRITICAL insights notify the PM channel automatically.
-6. **Multi-tenant isolation** — separate Qdrant collection and PostgreSQL schema per customer.
-7. **Better clustering at scale** — UMAP (768→20) + HDBSCAN for 10k+ conversations. Keep K-means for <5k.
+1. **Real-time ingestion** - webhook endpoints for Intercom, Zendesk, Freshdesk. Run pipeline on a rolling window instead of seeding from JSON.
+2. **Trend detection** - compare cluster composition between runs. Flag clusters that are GROWING before they become crises.
+3. **Semantic search** - `POST /search` that embeds a query and returns nearest-neighbor conversations via Qdrant.
+4. **Auto-severity calibration** - learn from PM status updates. If PMs keep escalating MEDIUM to CRITICAL, adjust the scoring weights.
+5. **Slack / Linear push** - CRITICAL insights notify the PM channel automatically.
+6. **Multi-tenant isolation** - separate Qdrant collection and PostgreSQL schema per customer.
+7. **Better clustering at scale** - UMAP (768→20) + HDBSCAN for 10k+ conversations. Keep K-means for <5k.
 
 ---
 
@@ -129,4 +129,4 @@ Zod validation at every boundary. ZodError caught by error middleware, returned 
 
 **Dynamic k selection.** Run K-means for k=4,6,8,10, pick the k with the best silhouette score. More upfront compute, better cluster quality across different datasets.
 
-**Job queue for the pipeline.** Currently runs in-process as a fire-and-forget async call. In production this should be BullMQ + Redis — survives server restarts, supports retries, can scale across workers.
+**Job queue for the pipeline.** Currently runs in-process as a fire-and-forget async call. In production this should be BullMQ + Redis - survives server restarts, supports retries, can scale across workers.
