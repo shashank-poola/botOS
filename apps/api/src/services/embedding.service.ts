@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { env } from "../config/env.config";
 import { qdrant, COLLECTION } from "./qdrant.service";
 
-const genai = new GoogleGenerativeAI(env.GOOGLE_API_KEY);
+const genai = new GoogleGenerativeAI(env.GEMINI_API_KEY);
 const embeddingModel = genai.getGenerativeModel({ model: "text-embedding-004" });
 
 export async function embedAndStore(

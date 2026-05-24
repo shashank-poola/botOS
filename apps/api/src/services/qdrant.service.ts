@@ -5,8 +5,8 @@ export const COLLECTION = "conversations";
 const VECTOR_SIZE = 768;
 
 export const qdrant = new QdrantClient({
-    url: env.QDRANT_URL as string,
-    apiKey: env.QDRANT_API_KEY,
+    url: env.QDRANT_CLUSTER_ID,
+    apiKey: env.QDRANT_URL,
 });
 
 export async function ensureCollection(): Promise<void> {

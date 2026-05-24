@@ -9,32 +9,37 @@ import { ensureCollection } from "../services/qdrant.service";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-interface ConversationData {
-    id: string;
-    messages: Array<{ role: string; content: string }>;
-    fullText: string;
-    messageCount: number;
-    resolved: boolean;
-    conversationAt: string;
+interface RawConversation {
+    id: number;
+    customer_name: string;
+    agent_name: string;
+    date: string;
+    channel: string;
+    product: string;
+    messages: Array<{ role: string; text: string }>;
 }
 
 async function seedIfEmpty(): Promise<void> {
     const count = await db.conversation.count();
     if (count > 0) return;
 
-    const filePath = resolve(__dirname, "../../../../data/conversations.json");
+    const filePath = resolve(__dirname, "../../../../data/conversation.json");
     const raw = readFileSync(filePath, "utf-8");
-    const { conversations } = JSON.parse(raw) as { conversations: ConversationData[] };
+    const items = JSON.parse(raw) as RawConversation[];
 
     await db.conversation.createMany({
-        data: conversations.map((c) => ({
-            id: c.id,
-            messages: c.messages,
-            fullText: c.fullText,
-            messageCount: c.messageCount,
-            resolved: c.resolved,
-            conversationAt: new Date(c.conversationAt),
-        })),
+        data: items.map((c) => {
+            const fullText = c.messages
+                .map((m) => `${m.role === "customer" ? "Customer" : "Agent"}: ${m.text}`)
+                .join("\n");
+            return {
+                messages: c.messages,
+                fullText,
+                messageCount: c.messages.length,
+                resolved: c.messages.at(-1)?.role === "agent",
+                conversationAt: new Date(c.date),
+            };
+        }),
         skipDuplicates: true,
     });
 }
@@ -47,6 +52,11 @@ export async function runPipeline(runId: number): Promise<void> {
 
     const conversations = await db.conversation.findMany({
         select: { id: true, fullText: true },
+    });
+
+    await db.analysisRun.update({
+        where: { id: runId },
+        data: { totalConversations: conversations.length },
     });
 
     await embedAndStore(conversations);
@@ -99,8 +109,8 @@ export async function runPipeline(runId: number): Promise<void> {
         });
 
         const exampleQuotes = memberConvos.slice(0, 3).map((c) => {
-            const line = c.fullText.split("\n").find((l) => l.startsWith("User:"));
-            return line?.replace("User:", "").trim() ?? c.fullText.substring(0, 100);
+            const line = c.fullText.split("\n").find((l) => l.startsWith("Customer:"));
+            return line?.replace("Customer:", "").trim() ?? c.fullText.substring(0, 100);
         });
 
         await db.insight.create({
